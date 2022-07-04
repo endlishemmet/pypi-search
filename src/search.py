@@ -32,3 +32,4 @@ for elems in divs:
         topic = topic.split('.')
         topic_names.append(topic[0]) if topic[0] not in topic_names else ''
     print(topic_names)
+    
