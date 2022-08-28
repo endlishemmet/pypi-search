@@ -1,35 +1,47 @@
 import requests, re
+from os import system
 from bs4 import BeautifulSoup as bs
-from rich import print
-from rich.markdown import Markdown
 
-response = requests.get('https://pypi.org/search')
-soup = bs(response.content, 'html.parser')
 
-divs = soup.find_all('div', attrs={'class': 'accordion accordion--closed'})
+class Package:
+    def __init__(self, pip='pip'):
+        self.pip = pip
 
-categories = {}
-for elems in divs:
-    
-    button = elems.find('button', 
-        attrs={
-            'type': 'button', 
-            'class': re.compile(r'accordion__link -js-accordion-trigger'),
-            'aria-controls': re.compile(r'accordion-.*')
+    def search(self, query) -> dict | None:
+        response = requests.get(f'https://pypi.org/project/{query}')
+        soup = bs(response.content, 'html.parser')
+
+        Navigation = soup.find('div', attrs={'class': 'vertical-tabs__panel'})
+        ProjectDescription = Navigation.find('div', attrs={'id': 'description'}).get_text().strip()
+        History = Navigation.find('div', attrs={'id': 'history'})
+        ReleaseTimeLine = History.find('div', attrs={'class': 'release-timeline'})
+        ReleaseTimeLineCurrent = ReleaseTimeLine.find('div', attrs={'class': 'release release--latest release--current'})
+        ReleaseTimeLineCurrentVersion = ReleaseTimeLineCurrent.a.find('p', attrs={'class': 'release__version'}).text.strip()
+        ReleaseTimeLineCurrentDate = ReleaseTimeLineCurrent.a.find('p', attrs={'class': 'release__version-date'}).time.text.strip()
+        Release = ReleaseTimeLine.find_all('div', attrs={'class': 'release'})
+
+        return {
+            'name': query,
+            'Project.Description': ProjectDescription,
+            'Release.TimeLine': [[i.a.find('p', attrs={'class': 'release__version'}).text.strip(), i.a.find('p', attrs={'class': 'release__version-date'}).time.text.strip()] for i in Release],
+            'Release.TimeLine.Current.Version': ReleaseTimeLineCurrentVersion,
+            'Release.TimeLine.Current.Date': ReleaseTimeLineCurrentDate
         }
-    )
+    def install(self, package_name) -> Exception | None | str:
+        match self.pip:
+            case "pip":
+                system(f"{self.pip} install {package_name}")
+            case "pip3":
+                system(f"{self.pip} install {package_name}")
+            case _:
+                raise ValueError("pip command name not found")
 
-    checkbox_tree = button.find_next_sibling().find('div', 
-        attrs={
-            'class': 'checkbox-tree'
-        }
-    ) 
-    ul = checkbox_tree.ul
-    
-    topics = [i.get('for').replace('_', '') for i in ul.find_all('label', attrs={'class': 'checkbox-tree__label', 'for': re.compile('.*')})]
-    topic_names = []
-    for topic in topics:
-        topic = topic.split('.')
-        topic_names.append(topic[0]) if topic[0] not in topic_names else ''
-    print(topic_names)
-    
+
+    def include(self) -> Exception | None:
+        return __import__(self.package_name)
+
+
+if __name__ == "__main__":
+    pkg = Package()
+    print(pkg.search("flask")["Project.Description"])
+    pkg.install("flask")
